@@ -1,0 +1,4 @@
+# Keep the working tree on LF regardless of the cloning platform's core.autocrlf.
+# Git for Windows defaults to autocrlf=true, which would otherwise check these
+# files out as CRLF and make `pnpm format` fail on an untouched clone.
+* text=auto eol=lf
