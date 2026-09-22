@@ -1,0 +1,45 @@
+{
+  "name": "good-verify",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "description": "Human-led QA, reproducible evidence, and verification workflows.",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "start": "tsx src/interfaces/cli.ts serve",
+    "gv": "tsx src/interfaces/cli.ts",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verify": "pnpm test && pnpm build && pnpm format",
+    "format": "prettier --check src tests scripts samples docs *.md *.json *.ts .github/workflows/verify.yml",
+    "test:e2e": "playwright test",
+    "browser:install": "playwright install chromium",
+    "sample": "tsx samples/editor/server.ts"
+  },
+  "dependencies": {
+    "cross-spawn": "7.0.6",
+    "fastify": "5.12.5",
+    "playwright": "1.63.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "prettier": "3.9.8",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}
