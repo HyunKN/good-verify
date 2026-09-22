@@ -166,7 +166,10 @@ it("API requires local token or same-origin UI session", async () => {
       headers: { host: "127.0.0.1:4318" },
     });
     const nonce = /name="gv-nonce" content="([a-f0-9]+)"/.exec(page.body)?.[1];
-    expect(nonce).toBeTruthy();
+    expect(
+      nonce,
+      "The nonce ships in the served index.html, so the UI must be built first. Run pnpm build, or pnpm verify which builds before testing.",
+    ).toBeTruthy();
     const bootstrap = await app.inject({
       method: "POST",
       url: "/api/v1/ui-session",

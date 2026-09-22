@@ -15,7 +15,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify": "pnpm test && pnpm build && pnpm format",
+    "verify": "pnpm build && pnpm test && pnpm format",
     "format": "prettier --check src tests scripts samples docs *.md *.json *.ts .github/workflows/verify.yml",
     "test:e2e": "playwright test",
     "browser:install": "playwright install chromium",
