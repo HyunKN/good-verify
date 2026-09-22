@@ -125,7 +125,11 @@ function App() {
   useEffect(() => {
     void fetch("/api/v1/ui-session", {
       method: "POST",
-      headers: { "x-gv-ui": "1" },
+      headers: { "x-gv-ui": "1", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nonce: document.querySelector<HTMLMetaElement>('meta[name="gv-nonce"]')
+          ?.content,
+      }),
     })
       .then((r) => {
         if (!r.ok)

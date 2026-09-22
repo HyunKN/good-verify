@@ -6,11 +6,37 @@ import { fixture } from "./helpers.js";
 import { redact } from "../src/core/redaction.js";
 import { validateScenario } from "../src/core/model.js";
 import { Store } from "../src/adapters/storage.js";
+import { generateTest } from "../src/adapters/generator.js";
 import {
   htmlReport,
   markdownReport,
   issueTemplate,
 } from "../src/adapters/report.js";
+
+it("keeps free text inside the generated test comment for every line terminator", () => {
+  // U+2028 and U+2029 end a single-line comment in ECMAScript, so stripping only
+  // CR and LF would turn the trailing text into code in an exported spec that is
+  // meant to run on another machine.
+  const source = generateTest({
+    id: randomUUID(),
+    projectId: randomUUID(),
+    sessionId: randomUUID(),
+    name: "line terminator",
+    version: 1,
+    status: "draft",
+    createdAt: new Date().toISOString(),
+    prerequisites: "before\u2028process.exit(9);\u2029require('fs');\rx\ny",
+    steps: [],
+    assertions: [],
+  } as unknown as Parameters<typeof generateTest>[0]);
+  const comment = source
+    .split("\n")
+    .find((line) => line.startsWith("// before"));
+  expect(comment).toContain("process.exit(9);");
+  expect(comment).toContain("require('fs');");
+  for (const terminator of ["\u2028", "\u2029", "\r", "\n"])
+    expect(comment).not.toContain(terminator);
+});
 
 it("serializes metadata reads with concurrent writes without losing entries", async () => {
   const f = await fixture();

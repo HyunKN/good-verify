@@ -146,6 +146,8 @@ it("API requires local token or same-origin UI session", async () => {
         })
       ).statusCode,
     ).toBe(200);
+    // Header-only bootstrap must not hand out authority: a raw local client can
+    // set Host, Origin and x-gv-ui, but cannot obtain a served-page nonce.
     expect(
       (
         await app.inject({
@@ -158,7 +160,64 @@ it("API requires local token or same-origin UI session", async () => {
           },
         })
       ).statusCode,
+    ).toBe(403);
+    const page = await app.inject({
+      url: "/",
+      headers: { host: "127.0.0.1:4318" },
+    });
+    const nonce = /name="gv-nonce" content="([a-f0-9]+)"/.exec(page.body)?.[1];
+    expect(nonce).toBeTruthy();
+    const bootstrap = await app.inject({
+      method: "POST",
+      url: "/api/v1/ui-session",
+      headers: {
+        host: "127.0.0.1:4318",
+        origin: "http://127.0.0.1:4318",
+        "x-gv-ui": "1",
+      },
+      payload: { nonce },
+    });
+    expect(bootstrap.statusCode).toBe(200);
+    const session = /gv-session=([a-f0-9]+)/.exec(
+      String(bootstrap.headers["set-cookie"]),
+    )?.[1];
+    // The cookie must be a revocable session id, never the API token itself.
+    expect(session).toBeTruthy();
+    expect(session).not.toBe(token);
+    expect(
+      (
+        await app.inject({
+          url: "/api/v1/projects",
+          headers: { host: "127.0.0.1:4318", cookie: `gv-session=${session}` },
+        })
+      ).statusCode,
     ).toBe(200);
+    // A session id is not an API token, and a consumed nonce cannot be replayed.
+    expect(
+      (
+        await app.inject({
+          url: "/api/v1/projects",
+          headers: {
+            host: "127.0.0.1:4318",
+            authorization: `Bearer ${session}`,
+          },
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/v1/ui-session",
+          headers: {
+            host: "127.0.0.1:4318",
+            origin: "http://127.0.0.1:4318",
+            "x-gv-ui": "1",
+          },
+          payload: { nonce },
+        })
+      ).statusCode,
+    ).toBe(403);
     expect(
       (
         await app.inject({

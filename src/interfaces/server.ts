@@ -27,6 +27,26 @@ export async function createServer(options: {
 }) {
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
   const token = options.token || randomBytes(32).toString("hex");
+  // The cookie must not be the API token itself: cookies cannot be scoped to a
+  // port, so any other loopback service under /api/v1 would receive it. Session
+  // ids are revocable and meaningless outside this process.
+  const sessions = new Set<string>();
+  const nonces = new Map<string, number>();
+  const issueNonce = () => {
+    const at = Date.now();
+    for (const [value, expiry] of nonces)
+      if (expiry <= at) nonces.delete(value);
+    while (nonces.size >= 64) nonces.delete(nonces.keys().next().value!);
+    const nonce = randomBytes(32).toString("hex");
+    nonces.set(nonce, at + 300000);
+    return nonce;
+  };
+  const consumeNonce = (value: unknown) => {
+    if (typeof value !== "string") return false;
+    const expiry = nonces.get(value);
+    nonces.delete(value);
+    return expiry !== undefined && expiry > Date.now();
+  };
   const workbench = new Workbench(new Store(options.dataDir), options.headless);
   await workbench.init();
   const port = options.port ?? 4318;
@@ -63,7 +83,7 @@ export async function createServer(options: {
       .find((x) => x.startsWith("gv-session="))
       ?.slice(11);
     const bearerValid = !!bearer && same(bearer, token);
-    if (!bearerValid && !(cookie && same(cookie, token)))
+    if (!bearerValid && !(cookie && sessions.has(cookie)))
       return reply.code(401).send({ error: "로컬 인증이 필요합니다." });
     if (!bearerValid && !["GET", "HEAD"].includes(req.method) && !origin)
       return reply.code(403).send({ error: "Origin이 필요합니다." });
@@ -90,9 +110,21 @@ export async function createServer(options: {
       req.headers["x-gv-ui"] !== "1"
     )
       return reply.code(403).send({ error: "로컬 화면에서 시작하세요." });
+    // The nonce proves the caller actually loaded index.html from this service,
+    // which a raw HTTP client cannot do by setting headers alone. Under --dev the
+    // UI comes from Vite and cannot carry one, so that documented dev-only
+    // widening keeps the previous behaviour.
+    if (!options.dev && !consumeNonce((req.body as { nonce?: unknown })?.nonce))
+      return reply
+        .code(403)
+        .send({ error: "화면을 새로고침한 뒤 다시 시작하세요." });
+    const session = randomBytes(32).toString("hex");
+    while (sessions.size >= 32)
+      sessions.delete(sessions.values().next().value!);
+    sessions.add(session);
     reply.header(
       "Set-Cookie",
-      `gv-session=${token}; HttpOnly; SameSite=Strict; Path=/api/v1`,
+      `gv-session=${session}; HttpOnly; SameSite=Strict; Path=/api/v1`,
     );
     return { ready: true };
   });
@@ -252,6 +284,17 @@ export async function createServer(options: {
     try {
       const body = await fs.readFile(file);
       const ext = path.extname(file);
+      if (ext === ".html")
+        return reply
+          .type("text/html; charset=utf-8")
+          .send(
+            body
+              .toString()
+              .replace(
+                "</head>",
+                `<meta name="gv-nonce" content="${issueNonce()}"/></head>`,
+              ),
+          );
       return reply
         .type(
           (

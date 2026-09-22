@@ -22,7 +22,9 @@ export function generateTest(scenario: Scenario) {
     `import { test, expect } from '@playwright/test';`,
     ``,
     `// Set BASE_URL to an isolated test environment. Review prerequisites before running.`,
-    `// ${scenario.prerequisites.replace(/[\r\n]/g, " ")}`,
+    // U+2028 and U+2029 also terminate a single-line comment in ECMAScript, so
+    // stripping only CR and LF would let this text escape into executable code.
+    `// ${scenario.prerequisites.replace(/[\r\n\u2028\u2029]/g, " ")}`,
     `// Optional private browser preparation. Never commit the storage-state file.`,
     `test.use({ storageState: process.env.STORAGE_STATE || undefined });`,
     `test(${quote(scenario.name)}, async ({ page: initialPage, context }) => {`,
